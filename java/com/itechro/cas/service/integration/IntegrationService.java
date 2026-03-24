@@ -854,13 +854,32 @@ public class IntegrationService {
     public UpmDetailResponse getUpmDetailsByAdUserAndAppCode(UmpDetailLoadByAdIdRQ upmDetailLoadRQ) throws AppsException {
         LOG.info("START: Get Upm detail by AD userID and appCode: {}", upmDetailLoadRQ);
 
+        if (upmDetailLoadRQ == null) {
+            LOG.warn("WARN: Upm detail load by AD id request is null");
+            return null;
+        }
+
+        String adUserID = upmDetailLoadRQ.getAdUserID();
+        if (adUserID == null) {
+            LOG.warn("WARN: Upm detail load request adUserID is null");
+            return null;
+        }
+
+        String appCodeFromRQ = StringUtils.isNotBlank(upmDetailLoadRQ.getAppCode()) ? upmDetailLoadRQ.getAppCode() : appCode;
+        String cacheKey = "ad:" + adUserID + ":" + appCodeFromRQ;
+        UpmDetailResponse cachedResponse = UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.get(cacheKey);
+        if (cachedResponse != null) {
+            LOG.info("INFO: Returning cached Upm details for AD key: {}", cacheKey);
+            return cachedResponse;
+        }
+
         ObjectMapper objectMapper = new ObjectMapper();
         UpmDetailResponse detailResponse = null;
         UpmDetailLoadRS result = null;
         String responseStr = null;
         if (this.umpDetailByAdUserEnable) {
-            String url = this.umpDetailByUserIdAndAppCodeUrl.replace("{userId}", upmDetailLoadRQ.getAdUserID())
-                    .replace("{appCode}", upmDetailLoadRQ.getAppCode());
+            String url = this.umpDetailByUserIdAndAppCodeUrl.replace("{userId}", adUserID)
+                    .replace("{appCode}", appCodeFromRQ);
             RestTemplate restTemplate = new RestTemplate();
             LOG.info("url:  {}", url);
             try {
@@ -884,6 +903,10 @@ public class IntegrationService {
 
         } else {
             LOG.warn("WARN: Upm detail by AD userID and appCode service is disabled {}", upmDetailLoadRQ);
+        }
+
+        if (detailResponse != null && detailResponse.isSuccess()) {
+            UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.put(cacheKey, detailResponse);
         }
         return detailResponse;
     }
