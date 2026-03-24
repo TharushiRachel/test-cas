@@ -10,8 +10,11 @@ import com.itechro.cas.model.dto.integration.request.UpmDetailLoadRQ;
 import com.itechro.cas.model.dto.integration.response.UpmDetailResponse;
 import com.itechro.cas.model.dto.master.UserDTO;
 import com.itechro.cas.security.helper.UserRetriever;
+import com.itechro.cas.service.cache.UpmDetailDistributedCache;
 import com.itechro.cas.service.integration.IntegrationService;
 import com.itechro.cas.service.master.SystemParameterService;
+import com.itechro.cas.util.PasswordUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +42,9 @@ public class SecurityService {
 
     @Autowired
     private IntegrationService integrationService;
+
+    @Autowired
+    private UpmDetailDistributedCache upmDetailDistributedCache;
 
     private Map<String, String> credentialsCache;
 
@@ -70,8 +76,12 @@ public class SecurityService {
 
     @Transactional(propagation = Propagation.SUPPORTS)
     public void expireUserFromCache(String userDetailsStr) {
-        Boolean activeDirectoryEnabled = this.systemParameterService.isActiveDirectoryEnabled();
-//        if (activeDirectoryEnabled) {
+        expireUserFromCache(userDetailsStr, null);
+    }
+
+    @Transactional(propagation = Propagation.SUPPORTS)
+    public void expireUserFromCache(String userDetailsStr, Integer internalUserId) {
+//        if (this.systemParameterService.isActiveDirectoryEnabled()) {
 //            String[] split = PasswordUtil.getSplittedUserDetailsStr(userDetailsStr);
 //            if (split != null) {
 //                this.removeUserCredentials(split[0]);
@@ -81,7 +91,21 @@ public class SecurityService {
         Hazelcast.getHazelcastInstanceByName(CachingConstants.CACHE_INSTANCE_NAME)
                 .getMap(CachingConstants.USERS_CACHE_KEY).remove(userDetailsStr);
 
-//        LOG.info("User cache cleared : {}", userDetailsStr);
+        String loginName = resolveLoginName(userDetailsStr);
+        if (loginName != null) {
+            upmDetailDistributedCache.invalidateForUser(loginName, internalUserId, casProperties.getApplicationCode());
+        }
+    }
+
+    private static String resolveLoginName(String userDetailsStr) {
+        if (StringUtils.isBlank(userDetailsStr)) {
+            return null;
+        }
+        String[] split = PasswordUtil.getSplittedUserDetailsStr(userDetailsStr);
+        if (split != null && split.length > 0 && StringUtils.isNotBlank(split[0])) {
+            return StringUtils.trim(split[0]);
+        }
+        return StringUtils.trim(userDetailsStr);
     }
 
     @Transactional(propagation = Propagation.SUPPORTS)

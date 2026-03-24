@@ -1,8 +1,21 @@
 package com.itechro.cas.config;
 
-import com.itechro.cas.model.dto.integration.response.UpmDetailResponse;
+import org.apache.commons.lang3.StringUtils;
 
+/**
+ * Helpers for UPM cache keys. Values are stored in Hazelcast map {@link com.itechro.cas.commons.constants.CachingConstants#UPM_DETAILS_CACHE_KEY}.
+ */
 public class UpmDetailResponseCacheConfig {
-    public static final TTLCache<String, UpmDetailResponse> UPM_DETAIL_CACHE = new TTLCache<>(30); // 30 minutes TTL
+
+    /**
+     * Canonical key for UPM loaded by AD user id + app code (must match IntegrationService AD UPM methods).
+     */
+    public static String adUpmCacheKey(String adUserId, String applicationCode) {
+        if (adUserId == null) {
+            return null;
+        }
+        String app = StringUtils.isNotBlank(applicationCode) ? StringUtils.trim(applicationCode) : "";
+        return "ad:" + StringUtils.trim(adUserId) + ":" + app;
+    }
 }
 

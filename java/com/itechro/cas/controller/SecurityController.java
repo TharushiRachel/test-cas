@@ -1,6 +1,8 @@
 package com.itechro.cas.controller;
 
+import com.itechro.cas.config.CasProperties;
 import com.itechro.cas.config.UpmDetailResponseCacheConfig;
+import com.itechro.cas.service.cache.UpmDetailDistributedCache;
 import com.itechro.cas.exception.aop.ResponseExceptionHandler;
 import com.itechro.cas.model.dto.integration.response.UpmDetailResponse;
 import com.itechro.cas.model.security.CredentialsDTO;
@@ -31,6 +33,12 @@ public class SecurityController extends BaseController {
     @Autowired
     private SystemParameterService systemParameterService;
 
+    @Autowired
+    private CasProperties casProperties;
+
+    @Autowired
+    private UpmDetailDistributedCache upmDetailDistributedCache;
+
     @RequestMapping(value = "/log-out", headers = "Accept=application/json", method = RequestMethod.POST)
     public void expireUserCache() {
 
@@ -46,7 +54,7 @@ public class SecurityController extends BaseController {
             } else {
                 userDetailsStr = credentialsDTO.getUserName();
             }
-            this.securityService.expireUserFromCache(userDetailsStr);
+            this.securityService.expireUserFromCache(userDetailsStr, credentialsDTO.getUserID());
         } catch (Exception e) {
             LOG.warn("user cache expiration failed for user {}", credentialsDTO.getUserName(), e);
         }
@@ -69,10 +77,13 @@ public class SecurityController extends BaseController {
 
         LOG.info("START : Get UPM details by ad user ID: {}", adUserID);
 
-        UpmDetailResponse userUPMDetails = UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.get(adUserID);
+        String upmKey = UpmDetailResponseCacheConfig.adUpmCacheKey(adUserID, casProperties.getApplicationCode());
+        UpmDetailResponse userUPMDetails = upmDetailDistributedCache.get(upmKey);
         if (userUPMDetails == null) {
             userUPMDetails = this.securityService.getUserUPMDetails(adUserID);
-            UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.put(adUserID, userUPMDetails);
+            if (upmKey != null && userUPMDetails != null) {
+                upmDetailDistributedCache.put(upmKey, userUPMDetails);
+            }
         }
 
         LOG.info("END : Get UPM details by ad user ID: {}", adUserID);
@@ -87,10 +98,14 @@ public class SecurityController extends BaseController {
 
         LOG.info("START : Get UPM details by ad user ID: {}", adUserID);
 
-        UpmDetailResponse userUPMDetails = UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.get(adUserID);
+        String appCode = casProperties.getApplicationCode();
+        String userIdKey = adUserID + ":" + appCode;
+        UpmDetailResponse userUPMDetails = upmDetailDistributedCache.get(userIdKey);
         if (userUPMDetails == null) {
             userUPMDetails = this.securityService.getUserUPMDetailsById(adUserID);
-            UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.put(adUserID, userUPMDetails);
+            if (userUPMDetails != null) {
+                upmDetailDistributedCache.put(userIdKey, userUPMDetails);
+            }
         }
 
         LOG.info("END : Get UPM details by ad user ID: {}", adUserID);

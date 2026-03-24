@@ -72,6 +72,7 @@ import com.itechro.cas.model.dto.sme.SmeCustomerTurnoverResDTO;
 import com.itechro.cas.model.dto.sme.SmeCustomerTurnoverRqDTO;
 import com.itechro.cas.model.dto.systemintegration.SystemIntegrationDTO;
 import com.itechro.cas.model.security.CredentialsDTO;
+import com.itechro.cas.service.cache.UpmDetailDistributedCache;
 import com.itechro.cas.service.customer.CustomerCribResponseService;
 import com.itechro.cas.service.faclititypaper.creditcalculator.CalculatorService;
 import com.itechro.cas.config.UpmDetailResponseCacheConfig;
@@ -505,6 +506,9 @@ public class IntegrationService {
     @Autowired
     private GroupExposureDetailDao groupExposureDetailDao;
 
+    @Autowired
+    private UpmDetailDistributedCache upmDetailDistributedCache;
+
     private static final long COVENANT_LIST_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
     private final SimpleTTLCache<String, CustomerCovenantResponseDTO> covenantListCache = new SimpleTTLCache<>(COVENANT_LIST_CACHE_TTL);
 
@@ -641,7 +645,7 @@ public class IntegrationService {
         }
 
         String cacheKey = userId + ":" + appCodeFromRQ;
-        UpmDetailResponse cachedResponse = UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.get(cacheKey);
+        UpmDetailResponse cachedResponse = upmDetailDistributedCache.get(cacheKey);
         if (cachedResponse != null) {
             LOG.info("INFO: Returning cached Upm details for key: {}", cacheKey);
             return cachedResponse;
@@ -675,7 +679,7 @@ public class IntegrationService {
         }
 
         if (detailResponse != null && detailResponse.isSuccess()) {
-            UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.put(cacheKey, detailResponse);
+            upmDetailDistributedCache.put(cacheKey, detailResponse);
         }
         return detailResponse;
     }
@@ -794,6 +798,25 @@ public class IntegrationService {
     public UpmDetailResponse getUpmDetailsByAdUserIdAndAppCode(UmpDetailLoadByAdIdRQ upmDetailLoadRQ) throws AppsException {
         LOG.info("START: Get Upm detail by AD userID and appCode: {}", upmDetailLoadRQ);
 
+        if (upmDetailLoadRQ == null) {
+            LOG.warn("WARN: Upm detail load by AD id request is null");
+            return null;
+        }
+        String adUserID = StringUtils.trimToNull(upmDetailLoadRQ.getAdUserID());
+        if (adUserID == null) {
+            LOG.warn("WARN: Upm detail load request adUserID is null");
+            return null;
+        }
+
+        String effectiveAppCode = StringUtils.isNotBlank(upmDetailLoadRQ.getAppCode())
+                ? StringUtils.trim(upmDetailLoadRQ.getAppCode()) : appCode;
+        String cacheKey = UpmDetailResponseCacheConfig.adUpmCacheKey(adUserID, effectiveAppCode);
+        UpmDetailResponse cachedResponse = upmDetailDistributedCache.get(cacheKey);
+        if (cachedResponse != null) {
+            LOG.info("INFO: Returning cached Upm details for AD key: {}", cacheKey);
+            return cachedResponse;
+        }
+
         if (!this.umpDetailByAdUserIdAndAppCodeEnabled) {
             LOG.warn("WARN: Upm detail by AD userID and appCode service is disabled {}", upmDetailLoadRQ);
             return null; // or throw exception if this should be an error case
@@ -805,8 +828,8 @@ public class IntegrationService {
         String responseStr = null;
 
         String url = this.umpDetailByAdUserIdAndAppCodeUrl
-                .replace("{ADUser_ID}", upmDetailLoadRQ.getAdUserID())
-                .replace("{appCode}", appCode);
+                .replace("{ADUser_ID}", adUserID)
+                .replace("{appCode}", effectiveAppCode);
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(3000);
@@ -847,6 +870,9 @@ public class IntegrationService {
             throw new AppsException(AppsCommonErrorCode.APPS_UNAUTHORISED, e);
         }
 
+        if (detailResponse != null) {
+            upmDetailDistributedCache.put(cacheKey, detailResponse);
+        }
         return detailResponse;
     }
 
@@ -859,15 +885,16 @@ public class IntegrationService {
             return null;
         }
 
-        String adUserID = upmDetailLoadRQ.getAdUserID();
+        String adUserID = StringUtils.trimToNull(upmDetailLoadRQ.getAdUserID());
         if (adUserID == null) {
             LOG.warn("WARN: Upm detail load request adUserID is null");
             return null;
         }
 
-        String appCodeFromRQ = StringUtils.isNotBlank(upmDetailLoadRQ.getAppCode()) ? upmDetailLoadRQ.getAppCode() : appCode;
-        String cacheKey = "ad:" + adUserID + ":" + appCodeFromRQ;
-        UpmDetailResponse cachedResponse = UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.get(cacheKey);
+        String appCodeFromRQ = StringUtils.isNotBlank(upmDetailLoadRQ.getAppCode())
+                ? StringUtils.trim(upmDetailLoadRQ.getAppCode()) : appCode;
+        String cacheKey = UpmDetailResponseCacheConfig.adUpmCacheKey(adUserID, appCodeFromRQ);
+        UpmDetailResponse cachedResponse = upmDetailDistributedCache.get(cacheKey);
         if (cachedResponse != null) {
             LOG.info("INFO: Returning cached Upm details for AD key: {}", cacheKey);
             return cachedResponse;
@@ -905,8 +932,8 @@ public class IntegrationService {
             LOG.warn("WARN: Upm detail by AD userID and appCode service is disabled {}", upmDetailLoadRQ);
         }
 
-        if (detailResponse != null && detailResponse.isSuccess()) {
-            UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.put(cacheKey, detailResponse);
+        if (detailResponse != null) {
+            upmDetailDistributedCache.put(cacheKey, detailResponse);
         }
         return detailResponse;
     }

@@ -1,7 +1,9 @@
 package com.itechro.cas.service.customer;
 
 import com.itechro.cas.commons.constants.AppsConstants;
+import com.itechro.cas.config.CasProperties;
 import com.itechro.cas.config.UpmDetailResponseCacheConfig;
+import com.itechro.cas.service.cache.UpmDetailDistributedCache;
 import com.itechro.cas.dao.audit.WebAuditJDBCDao;
 import com.itechro.cas.dao.customer.*;
 import com.itechro.cas.dao.customer.jdbc.CustomerJdbcDao;
@@ -119,6 +121,12 @@ public class CustomerService {
 
     @Autowired
     private SecurityService securityService;
+
+    @Autowired
+    private CasProperties casProperties;
+
+    @Autowired
+    private UpmDetailDistributedCache upmDetailDistributedCache;
 
     @Autowired
     private ApplicationCovenantDao applicationCovenantDao;
@@ -791,11 +799,14 @@ public class CustomerService {
             customerCovenantResponseDTO.setCreatedUserDisplayName(customerCovenant.getCreatedUserDisplayName());
             customerCovenantResponseDTO.setCreatedDate(customerCovenant.getCreatedDate());
             customerCovenantResponseDTO.setStatus(customerCovenant.getStatus());
-            // Use TTLCache for UPM details
-            UpmDetailResponse cachedUpm = UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.get(customerCovenant.getCreatedBy());
+            String upmKey = UpmDetailResponseCacheConfig.adUpmCacheKey(
+                    customerCovenant.getCreatedBy(), casProperties.getApplicationCode());
+            UpmDetailResponse cachedUpm = upmKey != null ? upmDetailDistributedCache.get(upmKey) : null;
             if (cachedUpm == null) {
                 cachedUpm = securityService.getUserUPMDetails(customerCovenant.getCreatedBy());
-                UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE.put(customerCovenant.getCreatedBy(), cachedUpm);
+                if (upmKey != null && cachedUpm != null) {
+                    upmDetailDistributedCache.put(upmKey, cachedUpm);
+                }
             }
             customerCovenantResponseDTO.setWorkClass(String.valueOf(cachedUpm.getApplicationSecurityClass()));
             customerCovenantResponseDTO.setNoFrequencyDueDate(customerCovenant.getNoFrequencyDueDate());
