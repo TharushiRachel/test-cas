@@ -76,12 +76,8 @@ public class SecurityService {
 
     @Transactional(propagation = Propagation.SUPPORTS)
     public void expireUserFromCache(String userDetailsStr) {
-        expireUserFromCache(userDetailsStr, null);
-    }
-
-    @Transactional(propagation = Propagation.SUPPORTS)
-    public void expireUserFromCache(String userDetailsStr, Integer internalUserId) {
-//        if (this.systemParameterService.isActiveDirectoryEnabled()) {
+        Boolean activeDirectoryEnabled = this.systemParameterService.isActiveDirectoryEnabled();
+//        if (activeDirectoryEnabled) {
 //            String[] split = PasswordUtil.getSplittedUserDetailsStr(userDetailsStr);
 //            if (split != null) {
 //                this.removeUserCredentials(split[0]);
@@ -91,6 +87,15 @@ public class SecurityService {
         Hazelcast.getHazelcastInstanceByName(CachingConstants.CACHE_INSTANCE_NAME)
                 .getMap(CachingConstants.USERS_CACHE_KEY).remove(userDetailsStr);
 
+//        LOG.info("User cache cleared : {}", userDetailsStr);
+    }
+
+    /**
+     * Log-out: clears the Hazelcast user session entry and distributed UPM cache for this principal.
+     */
+    @Transactional(propagation = Propagation.SUPPORTS)
+    public void expireUserSessionFromCache(String userDetailsStr, Integer internalUserId) {
+        expireUserFromCache(userDetailsStr);
         String loginName = resolveLoginName(userDetailsStr);
         if (loginName != null) {
             upmDetailDistributedCache.invalidateForUser(loginName, internalUserId, casProperties.getApplicationCode());

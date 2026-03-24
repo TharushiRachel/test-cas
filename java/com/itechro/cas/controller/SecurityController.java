@@ -54,7 +54,7 @@ public class SecurityController extends BaseController {
             } else {
                 userDetailsStr = credentialsDTO.getUserName();
             }
-            this.securityService.expireUserFromCache(userDetailsStr, credentialsDTO.getUserID());
+            this.securityService.expireUserSessionFromCache(userDetailsStr, credentialsDTO.getUserID());
         } catch (Exception e) {
             LOG.warn("user cache expiration failed for user {}", credentialsDTO.getUserName(), e);
         }

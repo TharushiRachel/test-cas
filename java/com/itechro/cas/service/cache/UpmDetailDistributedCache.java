@@ -72,6 +72,6 @@ public class UpmDetailDistributedCache {
 
     private ConcurrentMap<String, UpmDetailResponse> map() {
         return Hazelcast.getHazelcastInstanceByName(CachingConstants.CACHE_INSTANCE_NAME)
-                .getMap(CachingConstants.UPM_DETAILS_CACHE_KEY);
+                .getMap(UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE);
     }
 }

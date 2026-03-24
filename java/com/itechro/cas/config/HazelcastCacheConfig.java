@@ -47,7 +47,7 @@ public class HazelcastCacheConfig {
         config.getMapConfigs().put(CachingConstants.SYSTEM_PARAMS_KEY, systemParameterCache);
 
         MapConfig upmDetailsCache = this.createCacheConfig(60 * 30);
-        config.getMapConfigs().put(CachingConstants.UPM_DETAILS_CACHE_KEY, upmDetailsCache);
+        config.getMapConfigs().put(UpmDetailResponseCacheConfig.UPM_DETAIL_CACHE, upmDetailsCache);
 
         return config;
     }

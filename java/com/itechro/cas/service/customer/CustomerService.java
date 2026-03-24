@@ -799,6 +799,7 @@ public class CustomerService {
             customerCovenantResponseDTO.setCreatedUserDisplayName(customerCovenant.getCreatedUserDisplayName());
             customerCovenantResponseDTO.setCreatedDate(customerCovenant.getCreatedDate());
             customerCovenantResponseDTO.setStatus(customerCovenant.getStatus());
+            
             String upmKey = UpmDetailResponseCacheConfig.adUpmCacheKey(
                     customerCovenant.getCreatedBy(), casProperties.getApplicationCode());
             UpmDetailResponse cachedUpm = upmKey != null ? upmDetailDistributedCache.get(upmKey) : null;
@@ -808,6 +809,7 @@ public class CustomerService {
                     upmDetailDistributedCache.put(upmKey, cachedUpm);
                 }
             }
+
             customerCovenantResponseDTO.setWorkClass(String.valueOf(cachedUpm.getApplicationSecurityClass()));
             customerCovenantResponseDTO.setNoFrequencyDueDate(customerCovenant.getNoFrequencyDueDate());
             customerCovenantResponseDTO.setIsExists(customerCovenant.getIsExists());
